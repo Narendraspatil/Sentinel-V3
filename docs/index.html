@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sentinel 3.0 – Complete Setup Guide</title>
+<style>
+  :root {
+    --dark: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #e3b341;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--dark); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.7; }
+
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 260px; background: var(--card); border-right: 1px solid var(--border); position: sticky; top: 0; height: 100vh; overflow-y: auto; flex-shrink: 0; padding: 1.5rem 1rem; }
+  .content { flex: 1; padding: 2rem 3rem; max-width: 900px; }
+
+  .sidebar-title { font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: .5rem; margin-top: 1.2rem; }
+  .sidebar-title:first-child { margin-top: 0; }
+  .sidebar a { display: block; padding: .35rem .6rem; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: .875rem; transition: all .15s; }
+  .sidebar a:hover { background: rgba(255,255,255,.05); color: var(--text); }
+  .sidebar a.active { background: rgba(88,166,255,.12); color: var(--accent); font-weight: 600; }
+
+  .page-hero { margin-bottom: 2.5rem; }
+  .page-hero h1 { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .page-hero p { color: var(--muted); margin-top: .5rem; font-size: 1rem; }
+
+  .phase-header { display: flex; align-items: center; gap: .75rem; margin: 2.5rem 0 1rem; padding: .75rem 1rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+  .phase-badge { background: var(--accent); color: #000; font-weight: 800; font-size: .75rem; padding: .2rem .6rem; border-radius: 20px; white-space: nowrap; }
+  .phase-header h2 { font-size: 1.15rem; font-weight: 700; }
+
+  .step { margin: 1.2rem 0; padding: 1.2rem 1.4rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; position: relative; }
+  .step-num { position: absolute; top: -12px; left: 1rem; background: var(--accent); color: #000; font-weight: 800; font-size: .7rem; padding: .15rem .5rem; border-radius: 20px; }
+  .step h3 { font-size: 1rem; font-weight: 700; margin-bottom: .6rem; margin-top: .3rem; }
+  .step p { color: var(--muted); font-size: .9rem; margin-bottom: .6rem; }
+  .step p:last-child { margin-bottom: 0; }
+  .step ul, .step ol { color: var(--muted); font-size: .9rem; padding-left: 1.4rem; }
+  .step li { margin-bottom: .3rem; }
+  .step li strong { color: var(--text); }
+
+  pre { background: #010409; border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.2rem; overflow-x: auto; margin: .8rem 0; font-size: .85rem; line-height: 1.6; }
+  code { font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace; }
+  pre code { color: #e6edf3; }
+  .cmd  { color: var(--green); }
+  .cmt  { color: var(--muted); font-style: italic; }
+  .str  { color: var(--yellow); }
+  .kw   { color: var(--accent); }
+  .val  { color: var(--purple); }
+  .path { color: #ffa657; }
+
+  p code, li code { background: rgba(255,255,255,.08); padding: .1em .35em; border-radius: 4px; font-size: .85em; color: var(--yellow); }
+
+  .callout { display: flex; gap: .75rem; padding: .9rem 1rem; border-radius: 8px; margin: .8rem 0; font-size: .875rem; }
+  .callout-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: .05rem; }
+  .callout.info    { background: rgba(88,166,255,.1);  border: 1px solid rgba(88,166,255,.3);  }
+  .callout.warn    { background: rgba(227,179,65,.1);  border: 1px solid rgba(227,179,65,.3);  color: #f0c674; }
+  .callout.success { background: rgba(63,185,80,.1);   border: 1px solid rgba(63,185,80,.3);   color: #7ee787; }
+  .callout.danger  { background: rgba(248,81,73,.1);   border: 1px solid rgba(248,81,73,.3);   color: #ff7b72; }
+  .callout div p { margin-bottom: .3rem; }
+  .callout div p:last-child { margin-bottom: 0; }
+
+  .progress-bar { display: flex; gap: 0; margin: 1.5rem 0 2rem; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+  .progress-segment { flex: 1; padding: .6rem .5rem; text-align: center; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .progress-segment.done    { background: rgba(63,185,80,.2);  color: var(--green); }
+  .progress-segment.current { background: rgba(88,166,255,.2); color: var(--accent); }
+  .progress-segment.pending { background: rgba(255,255,255,.03); color: var(--muted); }
+
+  .tag { display: inline-block; font-size: .7rem; font-weight: 700; padding: .15rem .45rem; border-radius: 4px; text-transform: uppercase; letter-spacing: .5px; margin-right: .3rem; }
+  .tag-win   { background: rgba(88,166,255,.2);  color: var(--accent); }
+  .tag-cloud { background: rgba(63,185,80,.2);   color: var(--green); }
+  .tag-once  { background: rgba(227,179,65,.2);  color: var(--yellow); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: .8rem 0; }
+  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } .content { padding: 1.5rem 1.2rem; } .sidebar { display: none; } }
+
+  .file-tree { background: #010409; border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.2rem; font-family: monospace; font-size: .85rem; line-height: 1.8; }
+  .ft-dir  { color: var(--accent); }
+  .ft-file { color: var(--text); }
+  .ft-note { color: var(--muted); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { display: flex; align-items: flex-start; gap: .6rem; padding: .4rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--muted); }
+  .checklist li:last-child { border: none; }
+  .check-icon { color: var(--green); font-size: 1rem; margin-top: .05rem; flex-shrink: 0; }
+
+  section { scroll-margin-top: 2rem; }
+  .pill { display: inline-flex; align-items: center; gap: .3rem; background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: .2rem .65rem; font-size: .8rem; color: var(--muted); margin: .2rem; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+  thead tr { border-bottom: 1px solid var(--border); }
+  th { text-align: left; padding: .5rem .8rem; color: var(--muted); font-weight: 600; }
+  td { padding: .5rem .8rem; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar">
+  <div style="font-weight:800;font-size:1rem;color:var(--accent);margin-bottom:1.5rem;">🛡️ Sentinel 3.0 Setup</div>
+  <div class="sidebar-title">Overview</div>
+  <a href="#overview">What you'll build</a><a href="#requirements">Requirements</a><a href="#structure">Folder structure</a><a href="#security">Security model</a>
+  <div class="sidebar-title">Phase 1 – Supabase</div>
+  <a href="#p1-project">Create project</a><a href="#p1-cli">CLI &amp; link</a><a href="#p1-db">Database + RLS</a><a href="#p1-auth">Auth settings</a><a href="#p1-secrets">Secrets &amp; functions</a>
+  <div class="sidebar-title">Phase 2 – GitHub</div>
+  <a href="#p2-repo">Repository</a><a href="#p2-pages">GitHub Pages</a><a href="#p2-actions">Secrets &amp; keep-alive</a>
+  <div class="sidebar-title">Phase 3 – Admin</div>
+  <a href="#p3-boot">First administrator</a><a href="#p3-mfa">MFA &amp; lock-down</a>
+  <div class="sidebar-title">Phase 4 – Windows agent</div>
+  <a href="#p4-prep">Prepare Windows</a><a href="#p4-reg">Register laptop</a><a href="#p4-svc">Install service</a><a href="#p4-exe">Build .exe</a><a href="#p4-release">Release manifest</a><a href="#p4-sysmon">Sysmon (optional)</a>
+  <div class="sidebar-title">Phase 5 – Use it</div>
+  <a href="#p5">Dashboard usage</a>
+  <div class="sidebar-title">Phase 6 – Help</div>
+  <a href="#trouble">Troubleshooting</a><a href="#migrate">Migration &amp; rollback</a><a href="#limits">Limitations</a><a href="#checklist">Final checklist</a>
+</nav>
+<main class="content">
+
+<div class="page-hero">
+  <h1>🛡️ Sentinel 3.0 – Complete Setup Guide</h1>
+  <p>GitHub Pages dashboard + Supabase (Auth, Postgres, Edge Functions) + Windows agent. No Railway. No webcam.</p>
+  <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.8rem;">
+    <span class="pill">🪟 Windows 10/11</span><span class="pill">🐍 Python 3.10+</span><span class="pill">⚡ Supabase</span><span class="pill">🐙 GitHub Pages</span><span class="pill">⏱ ~60 minutes</span>
+  </div>
+</div>
+
+<section id="overview">
+<div class="phase-header"><span class="phase-badge">OVERVIEW</span><h2>What You'll Build</h2></div>
+<div class="two-col">
+  <div class="step"><h3>☁️ Cloud</h3><p><strong>GitHub Pages</strong> serves the static dashboard. <strong>Supabase Auth</strong> signs admins in (password + TOTP). <strong>Supabase Postgres</strong> stores everything behind Row Level Security. <strong>Edge Functions</strong> are the only code that writes data. A daily <strong>GitHub Action</strong> keeps the project active.</p></div>
+  <div class="step"><h3>🖥️ Windows agent</h3><p>A Python Windows Service that watches Windows logins, USB storage, protected folders, applications, Defender/firewall and its own integrity. It buffers events in an encrypted local queue and uploads them over HTTPS to Edge Functions only.</p></div>
+</div>
+<div class="callout info"><span class="callout-icon">ℹ️</span><div><p><strong>Order matters:</strong> Supabase → GitHub → first admin → Windows agent. You need the Supabase project URL, the publishable key and an enrollment token before the agent can register.</p></div></div>
+</section>
+
+<section id="requirements">
+<div class="phase-header"><span class="phase-badge">BEFORE YOU START</span><h2>What You Need</h2></div>
+<div class="step"><h3>Accounts (free tiers work)</h3><ul>
+<li><strong>GitHub</strong> – hosts code, Pages and the keep-alive workflow. <em>Note: GitHub Pages on a free personal account requires a public repository. The repo contains no secrets (keys live in Supabase/GitHub secrets), but the source is visible. A paid GitHub plan allows Pages from a private repo.</em></li>
+<li><strong>Supabase</strong> – <a href="https://supabase.com" style="color:var(--accent)">supabase.com</a></li></ul></div>
+<div class="step"><h3>Software</h3><ul>
+<li><strong>Node.js 18+</strong> (for the Supabase CLI) and <strong>Git</strong> on your admin PC</li>
+<li><strong>Python 3.10+</strong> on each laptop to monitor (or a built <code>SentinelAgent.exe</code>)</li>
+<li>An <strong>Administrator</strong> command prompt on each laptop</li></ul></div>
+</section>
+
+<section id="structure">
+<div class="phase-header"><span class="phase-badge">REFERENCE</span><h2>Folder Structure</h2></div>
+<div class="step"><div class="file-tree">
+<span class="ft-dir">sentinel/</span>
+├── <span class="ft-dir">supabase/</span>
+│   ├── <span class="ft-file">config.toml</span>                 <span class="ft-note">← auth hardening, function settings</span>
+│   ├── <span class="ft-dir">migrations/</span><span class="ft-file">20261108000000_sentinel_schema.sql</span> <span class="ft-note">← tables, RLS, triggers</span>
+│   ├── <span class="ft-dir">functions/</span>                    <span class="ft-note">← Edge Functions (Deno/TypeScript)</span>
+│   │   ├── _shared/util.ts  device-register  device-sync  device-events
+│   │   └── device-command-result  device-rotate  admin-api  admin-bootstrap  health-check
+│   └── <span class="ft-dir">tests/</span><span class="ft-file">rls_test.sql</span>
+├── <span class="ft-dir">web/</span>                            <span class="ft-note">← GitHub Pages dashboard (index.html, app.js, style.css, config.js)</span>
+├── <span class="ft-dir">agent/</span>                          <span class="ft-note">← Windows machine</span>
+│   ├── <span class="ft-file">run_agent.py  sentinel_service.py  requirements.txt  sentinel_agent.spec</span>
+│   └── <span class="ft-dir">sentinel/</span>                   <span class="ft-note">← settings, protect (DPAPI), buffer, api, core, commands, monitors/</span>
+├── <span class="ft-dir">tools/</span><span class="ft-file">make_manifest.py</span>       <span class="ft-note">← trusted release hashes</span>
+├── <span class="ft-dir">tests/</span>                          <span class="ft-note">← agent tests (pytest)</span>
+├── <span class="ft-dir">.github/workflows/</span><span class="ft-file">pages.yml  supabase-keepalive.yml</span>
+└── <span class="ft-file">.env.example  .gitignore  README.md</span>
+</div></div>
+</section>
+
+<section id="security">
+<div class="phase-header"><span class="phase-badge">SECURITY</span><h2>How the pieces trust each other</h2></div>
+<div class="step"><div style="overflow-x:auto"><table>
+<thead><tr><th>Actor</th><th>Credential</th><th>What it can do</th></tr></thead><tbody>
+<tr><td>Browser (admin)</td><td>Supabase session JWT (+TOTP)</td><td><strong>Read-only</strong> table access via RLS; all changes go through <code>admin-api</code>, which re-checks admin role + MFA and writes an audit log</td></tr>
+<tr><td>Laptop agent</td><td>Own device ID + 256-bit secret</td><td>Only the four <code>device-*</code> functions; server stores an HMAC-SHA256 of the secret (keyed with a server-side pepper), never the secret</td></tr>
+<tr><td>GitHub Action</td><td>Health-check secret</td><td>Only the <code>health-check</code> function</td></tr>
+<tr><td>Anyone else</td><td>—</td><td>Nothing: anonymous role has no table privileges</td></tr></tbody></table></div>
+<div class="callout warn" style="margin-top:.8rem"><span class="callout-icon">⚠️</span><div><p><strong>Honest limits:</strong> a person with local Administrator rights can stop or modify any software on the laptop. Sentinel makes tampering <em>detectable and reported</em>, it cannot make itself unkillable. See <a href="#limits" style="color:var(--accent)">Limitations</a>.</p></div></div></div>
+</section>
+<hr/>
+
+<div class="progress-bar"><div class="progress-segment current">1 Supabase</div><div class="progress-segment pending">2 GitHub</div><div class="progress-segment pending">3 Admin</div><div class="progress-segment pending">4 Agent</div><div class="progress-segment pending">5 Use</div></div>
+
+<section id="p1-project">
+<div class="phase-header"><span class="phase-badge" style="background:var(--purple);color:#000">PHASE 1</span><h2>Step 1 — Create the Supabase project</h2></div>
+<div class="step"><span class="step-num">1A</span><h3>Create it</h3><ol>
+<li>supabase.com → <strong>New project</strong>. Pick the region closest to you.</li>
+<li>Set a strong <strong>database password</strong> and store it in a password manager (you will not need it day-to-day).</li>
+<li>When it finishes provisioning open <strong>Project Settings → General</strong> and copy the <strong>Project ID</strong> (the <code>REF</code> used below).</li>
+<li>Open <strong>Project Settings → API Keys</strong> and copy the <strong>Project URL</strong> and the <strong>publishable</strong> key (older projects: <em>anon</em> key). You will put these two public values on GitHub.</li></ol>
+<div class="callout danger"><span class="callout-icon">🔒</span><div><p><strong>Never</strong> copy the <em>secret</em> / <em>service_role</em> key anywhere except Supabase's own secrets. Edge Functions already receive it automatically.</p></div></div></div>
+</section>
+
+<section id="p1-cli">
+<div class="phase-header"><span class="phase-badge" style="background:var(--purple);color:#000">PHASE 1</span><h2>Step 2 — Install the CLI and link the project</h2></div>
+<div class="step"><span class="step-num">2A</span><h3>Get the code and link</h3>
+<pre><code><span class="cmd">git clone</span> https://github.com/<span class="val">YOUR-USER</span>/sentinel.git
+<span class="cmd">cd</span> sentinel
+<span class="cmd">npm install</span> -g supabase        <span class="cmt"># or: scoop install supabase</span>
+<span class="cmd">supabase login</span>
+<span class="cmd">supabase link</span> --project-ref <span class="val">REF</span></code></pre></div>
+</section>
+
+<section id="p1-db">
+<div class="phase-header"><span class="phase-badge" style="background:var(--purple);color:#000">PHASE 1</span><h2>Step 3 — Apply the database migration (tables + RLS)</h2></div>
+<div class="step"><span class="step-num">3A</span><h3>Push</h3>
+<pre><code><span class="cmd">supabase db push</span></code></pre>
+<p>This creates 17 tables, indexes, the append-only triggers, the admin/MFA helper functions and Row Level Security. RLS is <strong>enabled and forced</strong> on every table; <code>anon</code> has no privileges at all; <code>authenticated</code> gets read-only access and only if <code>is_admin()</code> is true; <code>device_credentials</code> and enrollment-token hashes are unreachable from the browser.</p></div>
+<div class="step"><span class="step-num">3B</span><h3>Verify (optional but recommended)</h3>
+<p>In <strong>SQL Editor</strong> run: <code>select relname, relrowsecurity, relforcerowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r';</code> — every row must show <code>true | true</code>.</p></div>
+</section>
+
+<section id="p1-auth">
+<div class="phase-header"><span class="phase-badge" style="background:var(--purple);color:#000">PHASE 1</span><h2>Step 4 — Authentication settings</h2></div>
+<div class="step"><span class="step-num">4A</span><h3>Harden Auth</h3>
+<p>Open <strong>Authentication</strong> in the dashboard and set:</p><ul>
+<li><strong>Sign In / Providers → Allow new users to sign up: OFF</strong> (the first admin is created by the bootstrap function, which is unaffected)</li>
+<li><strong>Email provider → Minimum password length: 12</strong>; require upper/lower/digits/symbols</li>
+<li><strong>Multi-Factor → TOTP: enabled</strong></li>
+<li><strong>Sessions: JWT expiry 3600 s</strong>, refresh-token rotation on</li>
+<li><strong>Rate limits:</strong> keep sign-in limits at the defaults or stricter (brute-force protection)</li>
+<li><strong>URL Configuration → Site URL:</strong> your Pages URL (set in Step 7)</li></ul>
+<p>These values are also in <code>supabase/config.toml</code>; you can apply them with <code>supabase config push</code> instead of clicking.</p></div>
+</section>
+
+<section id="p1-secrets">
+<div class="phase-header"><span class="phase-badge" style="background:var(--purple);color:#000">PHASE 1</span><h2>Step 5 — Secrets and Edge Functions</h2></div>
+<div class="step"><span class="step-num">5A</span><h3>Generate three random secrets</h3>
+<pre><code><span class="cmd">python</span> -c <span class="str">"import secrets;print(secrets.token_urlsafe(48))"</span>   <span class="cmt"># run 3 times: pepper, health-check, bootstrap</span></code></pre></div>
+<div class="step"><span class="step-num">5B</span><h3>Store them in Supabase (not in Git)</h3>
+<pre><code><span class="cmd">supabase secrets set</span> DEVICE_SECRET_PEPPER=<span class="val">&lt;secret 1&gt;</span> HEALTHCHECK_SECRET=<span class="val">&lt;secret 2&gt;</span> BOOTSTRAP_SECRET=<span class="val">&lt;secret 3&gt;</span> ALLOWED_ORIGIN=<span class="val">https://YOUR-USER.github.io</span></code></pre>
+<div class="callout danger"><span class="callout-icon">🔒</span><div><p><strong>Back up <code>DEVICE_SECRET_PEPPER</code>.</strong> If it is ever lost or changed, every device secret and token stops verifying and all laptops must be re-enrolled. <code>ALLOWED_ORIGIN</code> is the origin only (no path, no trailing slash).</p></div></div></div>
+<div class="step"><span class="step-num">5C</span><h3>Deploy all functions</h3>
+<pre><code><span class="cmd">supabase functions deploy</span>
+<span class="cmt"># expect 8 functions: admin-api admin-bootstrap device-command-result device-events device-register device-rotate device-sync health-check</span></code></pre>
+<p>The functions verify their own credentials (admin JWT, device secret or shared secret), so <code>verify_jwt = false</code> is set in <code>config.toml</code> for each.</p></div>
+</section>
+<hr/>
+
+<div class="progress-bar"><div class="progress-segment done">1 Supabase ✓</div><div class="progress-segment current">2 GitHub</div><div class="progress-segment pending">3 Admin</div><div class="progress-segment pending">4 Agent</div><div class="progress-segment pending">5 Use</div></div>
+
+<section id="p2-repo">
+<div class="phase-header"><span class="phase-badge" style="background:var(--accent);color:#000">PHASE 2</span><h2>Step 6 — Push the project to GitHub</h2></div>
+<div class="step"><span class="step-num">6A</span><h3>Create <code>sentinel</code> on github.com/new and push</h3>
+<pre><code><span class="cmd">git init</span> &amp;&amp; <span class="cmd">git add</span> . &amp;&amp; <span class="cmd">git commit</span> -m <span class="str">"Sentinel 3.0"</span>
+<span class="cmd">git branch</span> -M main
+<span class="cmd">git remote add</span> origin https://github.com/<span class="val">YOUR-USER</span>/sentinel.git
+<span class="cmd">git push</span> -u origin main</code></pre>
+<p><code>.gitignore</code> already excludes <code>.env</code> and build output. Check <code>git status</code> shows no secrets before pushing.</p></div>
+</section>
+
+<section id="p2-pages">
+<div class="phase-header"><span class="phase-badge" style="background:var(--accent);color:#000">PHASE 2</span><h2>Step 7 — GitHub Pages and the public config</h2></div>
+<div class="step"><span class="step-num">7A</span><h3>Repository variables (public values)</h3>
+<p><strong>Settings → Secrets and variables → Actions → Variables → New repository variable</strong>:</p>
+<table><tbody><tr><td><code>SUPABASE_URL</code></td><td><code>https://REF.supabase.co</code></td></tr><tr><td><code>SUPABASE_PUBLISHABLE_KEY</code></td><td>the publishable / anon key</td></tr></tbody></table>
+<p>The deploy workflow refuses to run if the key looks like a secret key.</p></div>
+<div class="step"><span class="step-num">7B</span><h3>Enable Pages from Actions</h3>
+<ol><li><strong>Settings → Pages → Build and deployment → Source: GitHub Actions</strong></li>
+<li><strong>Actions → Deploy dashboard to GitHub Pages → Run workflow</strong></li>
+<li>When green, open <code>https://YOUR-USER.github.io/sentinel/</code></li>
+<li>Back in Supabase set <strong>Site URL</strong> to that address, and confirm <code>ALLOWED_ORIGIN</code> equals <code>https://YOUR-USER.github.io</code>.</li></ol></div>
+</section>
+
+<section id="p2-actions">
+<div class="phase-header"><span class="phase-badge" style="background:var(--accent);color:#000">PHASE 2</span><h2>Step 8 — Keep-alive workflow</h2></div>
+<div class="step"><span class="step-num">8A</span><h3>Repository secrets</h3>
+<table><tbody><tr><td><code>SUPABASE_FUNCTIONS_URL</code></td><td><code>https://REF.supabase.co/functions/v1</code></td></tr><tr><td><code>HEALTHCHECK_SECRET</code></td><td>exactly the value from Step 5B (secret 2)</td></tr></tbody></table></div>
+<div class="step"><span class="step-num">8B</span><h3>Test it now</h3>
+<p><strong>Actions → Supabase keep-alive → Run workflow.</strong> Expect <code>attempt 1: HTTP 200</code> and <code>Keep-alive OK</code>. It then runs daily at 03:00 UTC, retries 5× with back-off on network errors, does not retry a 401, and opens a GitHub issue if it fails. The dashboard Overview also shows a yellow banner if no successful check was recorded in 36 hours.</p>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div><p>This creates real daily database activity, but Supabase decides what counts as activity. It is not a guarantee against pausing. If uninterrupted monitoring is essential, use a paid Supabase plan. GitHub also disables scheduled workflows after 60 days without repository activity — a push or manual run re-enables it.</p></div></div></div>
+</section>
+<hr/>
+
+<div class="progress-bar"><div class="progress-segment done">1 Supabase ✓</div><div class="progress-segment done">2 GitHub ✓</div><div class="progress-segment current">3 Admin</div><div class="progress-segment pending">4 Agent</div><div class="progress-segment pending">5 Use</div></div>
+
+<section id="p3-boot">
+<div class="phase-header"><span class="phase-badge" style="background:var(--green);color:#000">PHASE 3</span><h2>Step 9 — Create the first administrator</h2></div>
+<div class="step"><span class="step-num">9A</span><h3>Bootstrap (works once, only while no admin exists)</h3>
+<pre><code><span class="cmd">curl</span> -X POST https://<span class="val">REF</span>.supabase.co/functions/v1/admin-bootstrap ^
+  -H <span class="str">"x-bootstrap-secret: &lt;secret 3&gt;"</span> -H <span class="str">"Content-Type: application/json"</span> ^
+  -d <span class="str">"{\"email\":\"you@example.com\",\"password\":\"a-long-unique-passphrase\"}"</span></code></pre>
+<p>Success: <code>{"ok":true,...}</code>. The password (12+ chars) is handed straight to Supabase Auth; Sentinel never stores it. The account gets the <code>owner</code> role in <code>admin_profiles</code> — a role no ordinary user can assign, because there is no browser-writable path to that table.</p></div>
+<div class="step"><span class="step-num">9B</span><h3>First login</h3><p>Open the dashboard, sign in with that email and password. You land on Overview.</p></div>
+</section>
+
+<section id="p3-mfa">
+<div class="phase-header"><span class="phase-badge" style="background:var(--green);color:#000">PHASE 3</span><h2>Step 10 — MFA and lock-down</h2></div>
+<div class="step"><span class="step-num">10A</span><h3>Enable TOTP</h3><p><strong>Settings → Two-factor authentication → Set up authenticator app</strong>, scan the QR code, enter the 6-digit code. From now on the database itself rejects any session that has not passed MFA (RLS function <code>mfa_satisfied</code>), and the Edge Functions do the same check.</p></div>
+<div class="step"><span class="step-num">10B</span><h3>Remove the bootstrap secret and confirm sign-ups are off</h3>
+<pre><code><span class="cmd">supabase secrets unset</span> BOOTSTRAP_SECRET</code></pre>
+<p>Test: calling Supabase's <code>/auth/v1/signup</code> with a new email must return <em>"Signups not allowed"</em>. If it creates a user, turn off sign-ups (Step 4A). Even then, that user has no <code>admin_profiles</code> row and sees nothing.</p></div>
+<div class="callout success"><span class="callout-icon">✅</span><div><p><strong>Phases 1–3 done.</strong> The cloud side is complete.</p></div></div>
+</section>
+<hr/>
+
+<div class="progress-bar"><div class="progress-segment done">1 ✓</div><div class="progress-segment done">2 ✓</div><div class="progress-segment done">3 ✓</div><div class="progress-segment current">4 Agent</div><div class="progress-segment pending">5 Use</div></div>
+
+<section id="p4-prep">
+<div class="phase-header"><span class="phase-badge" style="background:var(--yellow);color:#000">PHASE 4</span><h2>Step 11 — Prepare the Windows laptop</h2></div>
+<div class="step"><span class="step-num">11A</span><h3>Install Python and dependencies</h3>
+<ol><li>Install Python 3.10+ from python.org with <strong>Add Python to PATH</strong> ticked.</li><li>Copy the <code>agent</code> folder to the laptop (e.g. <code>C:\Sentinel\agent</code>). Keep it somewhere only administrators can write.</li></ol>
+<pre><code><span class="cmt"># Administrator Command Prompt</span>
+<span class="cmd">cd</span> C:\Sentinel\agent
+<span class="cmd">pip install</span> -r requirements.txt
+<span class="cmd">python</span> -m pywin32_postinstall -install</code></pre></div>
+<div class="step"><span class="step-num">11B</span><h3>Turn on Windows auditing (needed for login events)</h3>
+<p>Windows only writes login/account events if auditing is enabled. Run once as Administrator:</p>
+<pre><code>auditpol /set /subcategory:"Logon" /success:enable /failure:enable
+auditpol /set /subcategory:"Logoff" /success:enable
+auditpol /set /subcategory:"Account Lockout" /failure:enable
+auditpol /set /subcategory:"User Account Management" /success:enable /failure:enable
+auditpol /set /subcategory:"Security Group Management" /success:enable /failure:enable
+auditpol /set /subcategory:"Audit Policy Change" /success:enable</code></pre>
+<p>Event IDs used: 4624 logon, 4625 failed logon, 4634/4647 logoff, 4720 user created, 4726 user deleted, 4732/4733 local group member added/removed, 4740 lockout, 4719 audit policy change, 1102 audit log cleared. The agent starts reading from <em>now</em>; it never replays old history.</p></div>
+</section>
+
+<section id="p4-reg">
+<div class="phase-header"><span class="phase-badge" style="background:var(--yellow);color:#000">PHASE 4</span><h2>Step 12 — Register the laptop</h2></div>
+<div class="step"><span class="step-num">12A</span><h3>Create a one-time enrollment token</h3><p>Dashboard → <strong>Settings → Enroll a new laptop</strong> → label it, choose how long it is valid, <strong>Create one-time token</strong>, copy it (shown once). It works for exactly one registration.</p></div>
+<div class="step"><span class="step-num">12B</span><h3>Register (Administrator prompt on the laptop)</h3>
+<pre><code><span class="cmd">python</span> run_agent.py register</code></pre>
+<table><tbody><tr><td><code>Functions URL</code></td><td><code>https://REF.supabase.co/functions/v1</code></td></tr><tr><td><code>Device name</code></td><td>e.g. <code>Johns-Laptop</code></td></tr><tr><td><code>One-time enrollment token</code></td><td>paste (hidden)</td></tr></tbody></table>
+<p>The server returns a unique device ID and secret <strong>once</strong>. The secret is encrypted with Windows DPAPI into <code>C:\ProgramData\Sentinel\secret.bin</code> and the folder is restricted to SYSTEM and Administrators. It is never printed or written to a plaintext JSON file.</p></div>
+</section>
+
+<section id="p4-svc">
+<div class="phase-header"><span class="phase-badge" style="background:var(--yellow);color:#000">PHASE 4</span><h2>Step 13 — Install and start the service</h2></div>
+<div class="step"><span class="step-num">13A</span>
+<pre><code><span class="cmd">python</span> run_agent.py install
+<span class="cmd">python</span> run_agent.py start
+<span class="cmd">sc</span> query SentinelAgent          <span class="cmt"># STATE : 4 RUNNING</span>
+<span class="cmd">python</span> run_agent.py status        <span class="cmt"># checks service, config and credential store</span>
+<span class="cmd">type</span> C:\ProgramData\Sentinel\logs\sentinel.log</code></pre>
+<p>Install sets <strong>delayed automatic start</strong> and a recovery policy: restart after 1, 2 and 5 minutes, then stop (so a broken agent can never loop forever). Every restart is reported as an <code>unclean_shutdown</code> event, and 4+ starts in 10 minutes raises a <em>critical</em> <code>service_crash_loop</code>. If the config or credentials are missing/corrupt the service stays up but idle, logs why, and the dashboard shows the laptop go silent.</p>
+<p>Within ~30 seconds the laptop shows <strong>Online</strong> on the dashboard. Other commands: <code>stop</code>, <code>restart</code>, <code>remove</code>.</p>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div><p>Edits to <code>config.json</code> take effect after a service restart. Changing <code>server_url</code>, <code>device_id</code> or <code>service_name</code> while running is reported as <code>config_tampered</code> (critical).</p></div></div></div>
+</section>
+
+<section id="p4-exe">
+<div class="phase-header"><span class="phase-badge" style="background:var(--yellow);color:#000">PHASE 4 — OPTIONAL</span><h2>Step 14 — Build a standalone .exe</h2></div>
+<div class="step"><span class="step-num">14A</span>
+<pre><code><span class="cmd">pip install</span> pyinstaller
+<span class="cmd">cd</span> agent
+<span class="cmd">pyinstaller</span> sentinel_agent.spec
+<span class="cmt"># dist\SentinelAgent.exe</span>
+dist\SentinelAgent.exe register
+dist\SentinelAgent.exe install
+dist\SentinelAgent.exe start</code></pre>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div><p>The .exe is unsigned, so SmartScreen/antivirus may warn about it. Signing it with a code-signing certificate is strongly recommended for anything beyond personal use. Windows service hosting from a PyInstaller exe could not be exercised in the Linux test environment — test it on one laptop first.</p></div></div></div>
+</section>
+
+<section id="p4-release">
+<div class="phase-header"><span class="phase-badge" style="background:var(--yellow);color:#000">PHASE 4</span><h2>Step 15 — Publish the trusted release hashes</h2></div>
+<div class="step"><span class="step-num">15A</span><h3>Why</h3><p>Hashes stored beside the agent can be edited together with the agent. Sentinel therefore compares what each laptop <em>reports</em> with a manifest <strong>you</strong> published to the server, and with first-seen baselines of its config and service registration.</p>
+<pre><code><span class="cmt"># on your trusted build machine, from the repo root</span>
+<span class="cmd">python</span> tools/make_manifest.py --source agent        <span class="cmt"># running from source</span>
+<span class="cmd">python</span> tools/make_manifest.py agent/dist/SentinelAgent.exe   <span class="cmt"># frozen build</span></code></pre>
+<p>Dashboard → <strong>Settings → Agent releases</strong> (owner only): version <code>3.0.0</code>, paste the JSON, tick <em>Mark as latest</em>, Publish. A laptop whose files differ gets <em>integrity: mismatch</em> and a critical alert. After a legitimate upgrade publish the new manifest and use <em>Accept current as baseline</em> on the device's Agent Health tab.</p></div>
+</section>
+
+<section id="p4-sysmon">
+<div class="phase-header"><span class="phase-badge" style="background:var(--yellow);color:#000">PHASE 4 — OPTIONAL</span><h2>Step 16 — Sysmon for deeper process visibility</h2></div>
+<div class="step"><span class="step-num">16A</span>
+<ol><li>Download Sysmon from Microsoft Sysinternals.</li>
+<li>Install with the low-volume config shipped in <code>docs\sysmon-minimal.xml</code>: <code>sysmon64.exe -accepteula -i docs\sysmon-minimal.xml</code></li>
+<li>Edit <code>C:\ProgramData\Sentinel\config.json</code>: <code>"sysmon_enabled": true</code>, then <code>python run_agent.py restart</code>.</li></ol>
+<p>The shipped config only logs process creation for a short list of risky tools and encoded/download PowerShell, to keep CPU and disk use negligible. The agent reads only <code>EventID 1</code> by default (<code>sysmon_event_ids</code>) and raises an event only when a process matches the watch-list. Check Sysmon's own log size in Event Viewer and keep it small.</p></div>
+</section>
+<hr/>
+
+<section id="p5">
+<div class="phase-header"><span class="phase-badge" style="background:var(--red);color:#fff">PHASE 5</span><h2>Step 17 — Using the dashboard</h2></div>
+<div class="step"><h3>Overview &amp; devices</h3><p>Overview shows registered/online/offline counts, critical and high alert counts, outdated agents, integrity problems, recent incidents and recent administrator actions. Click a laptop for its own dashboard with tabs: <strong>Overview, Security Events, Windows Logins, File &amp; Folder, Applications, USB, Agent Health, Commands, Settings</strong>. Every tab shows only that device.</p></div>
+<div class="step"><h3>Device status words</h3><ul>
+<li><strong>Online</strong> – contacted within the offline threshold (120 s)</li><li><strong>Unresponsive</strong> – quiet for 2–15 min</li><li><strong>Offline</strong> – quiet &gt; 15 min</li>
+<li><strong>Agent stopped</strong> – the agent reported a deliberate stop (service stop/shutdown)</li><li><strong>Revoked</strong> – credentials revoked</li><li><strong>Never connected</strong> – enrolled but no sync yet</li></ul></div>
+<div class="step"><h3>Blocked apps and protected folders</h3><p>Device → <strong>Settings</strong>: one executable per line (<code>chrome.exe</code>) and one full folder path per line. Blocked apps are only terminated while in <strong>Secure Mode</strong>. Protected-folder changes are logged in any mode (created/modified/deleted/renamed, path and time only — never file contents). Save; the laptop picks it up on its next sync (≤ 30 s by default).</p></div>
+<div class="step"><h3>Secure Mode and emergency commands</h3><p>Device Overview → <strong>Emergency response</strong>. Commands: Secure Mode on/off, lock workstation, quick scan, health report, integrity check, refresh config, restrict apps (temporary), rotate credentials, network isolate/restore, mark compromised, revoke device. Sensitive ones ask for confirmation; revoke requires typing the device name.</p>
+<p>A command is <strong>Pending</strong> (waiting for the laptop) → Delivered → Acknowledged → Executing → <strong>Completed/Failed</strong>. The dashboard only shows <em>Completed</em> after the laptop reports it, and Secure Mode in the dashboard only changes after the laptop confirms. Unclaimed commands expire (default 15 min).</p>
+<p><strong>Lock workstation</strong> disconnects the active console session (user returns to the sign-in screen) because a service cannot lock a desktop directly. <strong>Network isolate</strong> is off unless you set <code>"allow_network_isolation": true</code> in the laptop's <code>config.json</code>; it blocks outbound traffic except HTTPS to the IPs Supabase resolved to at that moment (may break if those change) and auto-restores after the timeout. Test it with the laptop physically with you first.</p></div>
+<div class="step"><h3>Logs, filters, export</h3><p><strong>Logs</strong> page (all devices) and each device tab support filters for device, date range, severity, category, source, event type, resolution status and text search, with 50-row pagination and <strong>CSV / JSON export</strong>. High/critical events can be marked resolved with a note (the original record is never altered). Security events are never deleted by Sentinel; only heartbeat samples can be pruned if the owner sets a retention period.</p></div>
+<div class="step"><h3>Severity</h3><table><tbody><tr><td><span class="tag" style="background:var(--red);color:#fff">Critical</span></td><td>Sentinel tampering, admin-group additions, audit log cleared, crash loops, rejected credentials</td></tr><tr><td><span class="tag" style="background:rgba(255,154,60,.25);color:#ff9a3c">High</span></td><td>Defender/firewall/RDP settings weakened, user created/deleted, blocked app killed, lockouts</td></tr><tr><td><span class="tag tag-once">Medium</span></td><td>Failed-login bursts, new USB device, RDP logon, protected-folder activity, config warnings</td></tr><tr><td><span class="tag" style="background:rgba(139,148,158,.2);color:var(--muted)">Low</span></td><td>Normal logons/logoffs, known USB, informational</td></tr></tbody></table></div>
+</section>
+<hr/>
+
+<section id="trouble">
+<div class="phase-header"><span class="phase-badge" style="background:var(--red);color:#fff">PHASE 6</span><h2>Troubleshooting</h2></div>
+<div class="step"><h3>🔴 Login says "Invalid email or password"</h3><ul><li>The message is intentionally generic. Confirm the account exists in Supabase → Authentication → Users.</li><li>Too many attempts → wait a few minutes (Auth rate limit).</li><li>"not an authorized Sentinel administrator": the user exists but has no <code>admin_profiles</code> row (run bootstrap, or it is not the bootstrapped email).</li></ul></div>
+<div class="step"><h3>🔴 Dashboard shows empty tables / "permission denied" / RLS errors</h3><ul><li>You enrolled TOTP but signed in without the code in this browser session → sign out and in again; MFA-less sessions are denied on purpose.</li><li><code>permission denied for table …</code> from the browser means you tried a write; writes only go through <code>admin-api</code>.</li><li>Never "fix" this by disabling RLS or granting <code>anon</code> access.</li></ul></div>
+<div class="step"><h3>🔴 Edge Function errors</h3><ul><li><strong>CORS error in the browser console:</strong> <code>ALLOWED_ORIGIN</code> is wrong (must be exactly <code>https://USER.github.io</code>). Re-run <code>supabase secrets set</code>; no redeploy needed.</li><li><strong>500 internal_error:</strong> Supabase → Edge Functions → the function → Logs. A message about <code>DEVICE_SECRET_PEPPER</code> means that secret is missing or under 32 characters.</li><li><strong>404 / not found:</strong> run <code>supabase functions deploy</code>.</li><li><strong>401 unauthenticated / 403 mfa_required</strong> from <code>admin-api</code>: sign in again with the TOTP code.</li></ul></div>
+<div class="step"><h3>🔴 GitHub Pages not deploying / blank page</h3><ul><li>Settings → Pages → Source must be <strong>GitHub Actions</strong>.</li><li>Workflow fails with "Set repository VARIABLES": add <code>SUPABASE_URL</code> and <code>SUPABASE_PUBLISHABLE_KEY</code> under <em>Variables</em> (not Secrets).</li><li>Page says "config.js is not configured": the workflow did not run after you added the variables — run it again.</li><li>Free accounts need a public repo for Pages.</li></ul></div>
+<div class="step"><h3>🔴 Keep-alive workflow fails or never runs</h3><ul><li><code>Missing repository secrets</code> → add <code>SUPABASE_FUNCTIONS_URL</code> and <code>HEALTHCHECK_SECRET</code> as <em>Secrets</em>.</li><li><code>401</code> → the GitHub secret differs from the Supabase one. Re-set both with the same value.</li><li>Schedules pause after 60 days of repo inactivity and may start late (GitHub runs them best-effort). Run it manually to re-arm.</li><li>If the Supabase project is paused: Supabase dashboard → <strong>Restore project</strong>.</li></ul></div>
+<div class="step"><h3>🔴 Registration fails</h3><ul><li><code>invalid_enrollment_token</code>: token already used, expired or mistyped. Create a new one.</li><li><code>rate_limited</code>: wait a minute.</li><li><code>Could not reach the server</code>: check the Functions URL ends with <code>/functions/v1</code> and begins with <code>https://</code>.</li></ul></div>
+<div class="step"><h3>🔴 Device shows Offline / no heartbeats</h3><ul><li><code>sc query SentinelAgent</code> → must be RUNNING; else read <code>C:\ProgramData\Sentinel\logs\sentinel.log</code> and the Windows Event Viewer → Application.</li><li><code>python run_agent.py status</code> shows missing/corrupt config or credentials. If the secret store is damaged, revoke the device in the dashboard and enroll it again with a new token.</li><li>Firewall/proxy blocking outbound HTTPS to <code>*.supabase.co</code>.</li><li>Laptop clock wrong by more than a few minutes can distort timestamps (the server stores UTC).</li></ul></div>
+<div class="step"><h3>🔴 Device authentication failures (log: "server rejected device credentials")</h3><ul><li><code>device_auth_failures</code> in SQL editor lists reasons: <code>bad_secret</code>, <code>unknown_device</code>, <code>malformed</code>.</li><li>Pepper changed since enrollment → all devices fail; restore the original <code>DEVICE_SECRET_PEPPER</code>.</li><li>Credentials rotated while the laptop was off before it stored the new secret (rare) → revoke and re-enroll.</li><li>Revoked devices receive <code>403 revoked</code> and show <em>Revoked</em>.</li></ul></div>
+<div class="step"><h3>🔴 Offline events not syncing</h3><ul><li>Events wait in <code>C:\ProgramData\Sentinel\events.db</code> and keep their original timestamps. They are deleted locally only after the server acknowledges them, and duplicates are impossible (per-device dedup id).</li><li>Agent Health shows buffer usage; an alert is raised at 80% and 95%. When full, only low/medium events are dropped (counted and reported); high/critical are never dropped.</li><li>A corrupt buffer is quarantined as <code>events.db.corrupt-&lt;time&gt;</code> and a high event is raised.</li></ul></div>
+<div class="step"><h3>🔴 No Windows login events</h3><ul><li>Run Step 11B (auditing). The service must run as <strong>LocalSystem</strong> (the default) to read the Security log.</li><li>An <code>eventlog_unreadable</code> event in the logs says what failed.</li></ul></div>
+<div class="step"><h3>🔴 Service install: "Access denied" / starts then stops</h3><ul><li>Use an <strong>Administrator</strong> prompt. Register <em>before</em> installing.</li><li><code>pywin32_postinstall</code> not run → <code>python -m pywin32_postinstall -install</code>.</li><li>Service stays idle with "cannot start": fix the reported config/credential problem and <code>restart</code>.</li></ul></div>
+</section>
+
+<section id="migrate">
+<div class="phase-header"><span class="phase-badge">MIGRATION</span><h2>Moving from the old Railway version, and rolling back</h2></div>
+<div class="step"><h3>What this package does and does not migrate</h3><p>Sentinel 3.0 was built as a <strong>fresh installation</strong>. The old FastAPI/Railway source code and data were not available to the build, so <strong>no data is imported</strong> and old agents are <strong>not</strong> compatible (new endpoints, new credential format). Every laptop must be re-enrolled with a new one-time token.</p>
+<ol><li>Leave the Railway service running and untouched while you set up and verify Sentinel 3.0 on one laptop.</li>
+<li>Export what you need from the old dashboard/database (e.g. <code>pg_dump</code> from Railway) and keep it as an archive. Old photos are not carried over.</li>
+<li>On each laptop: stop and remove the old service (<code>python service.py stop</code>, <code>python service.py remove</code>), delete the old <code>agent/data</code> folder (it holds the old secret), install 3.0 (Steps 11–13).</li>
+<li>When all laptops report to Supabase, delete the Railway project and its PostgreSQL plugin.</li></ol>
+<p><strong>Rollback:</strong> <code>python run_agent.py stop</code>, <code>python run_agent.py remove</code>, reinstall the old agent folder and run its setup wizard against the still-running Railway server. Nothing in Railway is modified by 3.0. Database changes in Supabase are fully contained in one migration; deleting the Supabase project removes it.</p></div>
+</section>
+
+<section id="limits">
+<div class="phase-header"><span class="phase-badge">HONESTY</span><h2>Security limitations</h2></div>
+<div class="step"><ul>
+<li><strong>Not tamper-proof.</strong> A local administrator can stop the service, kill the process or edit files. Sentinel's goal is detection, evidence and alerting: a deliberate stop is reported as <em>agent stopped</em>; a kill or crash is reported as <em>unclean shutdown</em> on next start and as a silence (<em>Unresponsive/Offline</em>, plus a <code>device_silent</code> alert after 1 hour). If an attacker never lets the laptop reconnect, you only see the silence.</li>
+<li><strong>DPAPI machine scope</strong> protects the secret from other users and offline disk theft, but any code running as SYSTEM/Administrator on that laptop can decrypt it.</li>
+<li><strong>Server-side integrity is only as good as your manifest.</strong> A fully compromised agent that forges reports using the stolen device secret can lie. Revoke and rebuild such a device.</li>
+<li><strong>Log immutability:</strong> ordinary roles cannot edit or delete security events (RLS + triggers), and daily hash-chain checkpoints make silent edits detectable. Anyone with database-owner access (including you, in the Supabase dashboard) can still disable triggers — that is a privileged trust boundary, not absolute immutability.</li>
+<li><strong>No process attribution for file events</strong> (Windows does not reliably report which process changed a file); only path, operation and time are recorded.</li>
+<li><strong>Auto-update is intentionally not implemented</strong> because update authenticity cannot be verified without code signing. The dashboard shows installed vs latest version; update manually.</li>
+<li><strong>Rate limiting</strong> in Edge Functions is per function instance (best effort). Auth brute-force protection relies on Supabase Auth's own limits.</li>
+<li>Free-tier Supabase projects can pause and have storage limits; plan retention/export accordingly. Heartbeats are sampled every 5 minutes to keep volume low.</li></ul></div>
+</section>
+
+<section id="checklist">
+<div class="phase-header"><span class="phase-badge" style="background:var(--green);color:#000">CHECKLIST</span><h2>Everything working?</h2></div>
+<div class="step"><ul class="checklist">
+<li><span class="check-icon">✓</span><span><code>supabase db push</code> done; RLS shows enabled+forced on all tables</span></li>
+<li><span class="check-icon">✓</span><span>8 Edge Functions deployed; secrets set (pepper, health-check, bootstrap, allowed origin)</span></li>
+<li><span class="check-icon">✓</span><span>Sign-ups disabled; <code>/auth/v1/signup</code> refuses new users</span></li>
+<li><span class="check-icon">✓</span><span>Pages deployed; dashboard loads at your github.io URL</span></li>
+<li><span class="check-icon">✓</span><span>Keep-alive workflow ran manually with HTTP 200; Overview shows no yellow banner</span></li>
+<li><span class="check-icon">✓</span><span>Admin logs in with TOTP; <code>BOOTSTRAP_SECRET</code> removed</span></li>
+<li><span class="check-icon">✓</span><span>Laptop registered with a one-time token; <code>sc query SentinelAgent</code> = RUNNING; device Online</span></li>
+<li><span class="check-icon">✓</span><span>Release manifest published; device integrity = verified</span></li>
+<li><span class="check-icon">✓</span><span>Failed logon (lock screen, wrong PIN) appears in Windows Logins</span></li>
+<li><span class="check-icon">✓</span><span>Secure Mode command goes Pending → Completed only after the laptop confirms; blocked app is closed</span></li>
+<li><span class="check-icon">✓</span><span>Unplug network, trigger an event, reconnect → event arrives once with its original time</span></li>
+<li><span class="check-icon">✓</span><span><code>sc stop SentinelAgent</code> → dashboard shows Agent stopped and an alert</span></li>
+</ul></div>
+</section>
+
+</main></div>
+<script>
+const sections=document.querySelectorAll('section[id]'),links=document.querySelectorAll('.sidebar a');
+window.addEventListener('scroll',()=>{let c='';sections.forEach(s=>{if(window.scrollY>=s.offsetTop-100)c=s.id;});links.forEach(l=>l.classList.toggle('active',l.getAttribute('href')==='#'+c));});
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+name: Deploy dashboard to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/pages.yml"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write public config (URL + publishable key only)
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          test -n "$SUPABASE_URL" && test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo "::error::Set repository VARIABLES SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY"; exit 1; }
+          case "$SUPABASE_PUBLISHABLE_KEY" in sb_secret_*|*service_role*) echo "::error::That looks like a SECRET key. Use the publishable/anon key."; exit 1;; esac
+          printf 'window.SENTINEL_CONFIG = %s;\n' "$(jq -n --arg u "$SUPABASE_URL" --arg k "$SUPABASE_PUBLISHABLE_KEY" '{SUPABASE_URL:$u,SUPABASE_PUBLISHABLE_KEY:$k}')" > web/config.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: web }
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,18 @@
+<!-- Minimal, LOW-VOLUME Sysmon config for Sentinel: only process creation for a short list of risky tools
+     and encoded/download PowerShell. Install:  sysmon64.exe -accepteula -i docs\sysmon-minimal.xml
+     Update:  sysmon64.exe -c docs\sysmon-minimal.xml -->
+<Sysmon schemaversion="4.90">
+  <HashAlgorithms>sha256</HashAlgorithms>
+  <EventFiltering>
+    <RuleGroup name="sentinel-process-create" groupRelation="or">
+      <ProcessCreate onmatch="include">
+        <Image condition="end with">mimikatz.exe</Image>
+        <Image condition="end with">procdump.exe</Image>
+        <Image condition="end with">psexec.exe</Image>
+        <Image condition="end with">nc.exe</Image>
+        <Image condition="end with">ncat.exe</Image>
+        <CommandLine condition="contains any">-enc ;-EncodedCommand;DownloadString;Invoke-Expression;sc stop SentinelAgent;sc delete SentinelAgent</CommandLine>
+      </ProcessCreate>
+    </RuleGroup>
+  </EventFiltering>
+</Sysmon>

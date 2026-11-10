@@ -1,0 +1,4 @@
+requests>=2.32,<3
+psutil>=6.0,<8
+watchdog>=5.0,<7
+pywin32>=306; sys_platform == "win32"

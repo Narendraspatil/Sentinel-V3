@@ -1,0 +1,35 @@
+project_id = "sentinel"
+
+[auth]
+enable_signup = false              # public sign-ups OFF. Admins are created by admin-bootstrap / dashboard invite.
+minimum_password_length = 12
+password_requirements = "lower_upper_letters_digits_symbols"
+jwt_expiry = 3600                  # access token 1h; refresh tokens rotate
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+
+[auth.rate_limit]
+sign_in_sign_ups = 10              # brute-force protection (per 5 min per IP)
+token_refresh = 150
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+# Every function verifies its own credentials (device secret / admin JWT / shared secret).
+[functions.device-register]
+verify_jwt = false
+[functions.device-sync]
+verify_jwt = false
+[functions.device-events]
+verify_jwt = false
+[functions.device-command-result]
+verify_jwt = false
+[functions.device-rotate]
+verify_jwt = false
+[functions.admin-api]
+verify_jwt = false
+[functions.admin-bootstrap]
+verify_jwt = false
+[functions.health-check]
+verify_jwt = false

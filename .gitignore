@@ -1,0 +1,11 @@
+.env
+*.secret
+agent/build/
+agent/dist/
+__pycache__/
+*.pyc
+.venv/
+web/config.js.local
+supabase/.temp/
+supabase/.branches/
+node_modules/
