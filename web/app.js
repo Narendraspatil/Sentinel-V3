@@ -329,13 +329,19 @@ async function settingsView(v) {
   mfaPanel(v.querySelector("#mfa"));
 }
 async function mfaPanel(el) {
-  const { data } = await sb.auth.mfa.listFactors(); const f = data?.totp?.[0];
+  const { data } = await sb.auth.mfa.listFactors();
+  const f = data?.totp?.[0];                                   // verified factors only
+  const stale = (data?.all || []).filter(x => x.factor_type === "totp" && x.status !== "verified");   // abandoned earlier attempts
   if (f) { el.innerHTML = `<p>✅ TOTP enrolled.</p><button class="danger" id="m-rm">Remove</button>`; el.querySelector("#m-rm").onclick = async () => { const { data: a } = await sb.auth.mfa.getAuthenticatorAssuranceLevel(); if (a.currentLevel !== "aal2") return toast("Sign in with MFA first", "bad"); await sb.auth.mfa.unenroll({ factorId: f.id }); toast("Removed", "ok"); route(); }; return; }
-  el.innerHTML = '<button id="m-go" class="pri">Set up authenticator app</button>';
+  el.innerHTML = `<button id="m-go" class="pri">Set up authenticator app</button>${stale.length ? '<p class="sm mu">An unfinished earlier setup will be replaced.</p>' : ""}`;
   el.querySelector("#m-go").onclick = async () => {
-    const { data: en, error } = await sb.auth.mfa.enroll({ factorType: "totp" }); if (error) return toast(error.message, "bad");
-    el.innerHTML = `<p class="sm">Scan with an authenticator app, then enter the code.</p><img src="${en.totp.qr_code}" alt="QR" width="180" height="180" style="background:#fff;padding:6px"><p class="sm mu">Manual key: <code>${esc(en.totp.secret)}</code></p><input id="m-c" maxlength="6" placeholder="123456"> <button id="m-v" class="pri">Verify & enable</button>`;
-    el.querySelector("#m-v").onclick = async () => { const { data: ch } = await sb.auth.mfa.challenge({ factorId: en.id }); const { error: e2 } = await sb.auth.mfa.verify({ factorId: en.id, challengeId: ch.id, code: el.querySelector("#m-c").value.trim() }); if (e2) return toast("Invalid code", "bad"); toast("MFA enabled", "ok"); route(); };
+    for (const s of stale) await sb.auth.mfa.unenroll({ factorId: s.id });          // clear unverified leftovers
+    const { data: en, error } = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "Sentinel " + Date.now() }); if (error) return toast(error.message, "bad");
+    el.innerHTML = `<p class="sm">1. Scan this QR code with your authenticator app (or type the key below). 2. Enter the 6-digit code it shows.</p><div id="m-qr"></div><p class="sm mu">Manual key: <code>${esc(en.totp.secret)}</code></p><input id="m-c" inputmode="numeric" maxlength="6" placeholder="123456"> <button id="m-v" class="pri">Verify &amp; enable</button>`;
+    const img = document.createElement("img"); img.alt = "QR code"; img.width = 180; img.height = 180; img.style.cssText = "background:#fff;padding:6px";
+    img.src = en.totp.qr_code.startsWith("data:") ? en.totp.qr_code.replace(/^data:image\/svg\+xml;utf-8,/, "data:image/svg+xml;utf8,") : en.totp.qr_code;   // set via DOM so quotes in the SVG cannot break markup
+    el.querySelector("#m-qr").append(img);
+    el.querySelector("#m-v").onclick = async () => { const { data: ch, error: e1 } = await sb.auth.mfa.challenge({ factorId: en.id }); if (e1) return toast(e1.message, "bad"); const { error: e2 } = await sb.auth.mfa.verify({ factorId: en.id, challengeId: ch.id, code: el.querySelector("#m-c").value.trim() }); if (e2) return toast("Invalid code — check your phone's clock is set to automatic", "bad"); toast("MFA enabled. Sign out and back in to use it.", "ok"); route(); };
   };
 }
 
