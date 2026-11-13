@@ -25,7 +25,7 @@ class Agent:
         self.api = apimod.DeviceAPI(cfg["server_url"], cfg["device_id"], secret)
         self.config_fp, self.service_fp, self.file_hashes = settings.config_fingerprint(cfg), None, file_hashes()
         self.compromised = False; self.force_settings = False; self.revoked = False
-        self.threads, self.monitors = [], []
+        self.threads, self.monitors, self._thread_fns = [], [], {}
         self.ctx = self                                  # monitors/commands use the agent itself as their context
         self.posture = PostureMonitor(self); self.integrity = IntegrityMonitor(self)
         self.monitors = [WinLogMonitor(self), UsbMonitor(self), FileMonitor(self), AppMonitor(self), self.posture, self.integrity]
@@ -46,15 +46,26 @@ class Agent:
 
     def shutdown(self):
         self.stop.set(); self.wake_sync.set(); self.wake_upload.set()
-        try: self.api.sync(self._sync_payload(stopping=True))        # tell the server this was deliberate
-        except Exception: pass
         self.emitter.emit("agent_stopped", "agent", "medium", "Sentinel agent stopping (service stop/shutdown)")
-        try: self._upload_once()
+        self.state.set("running", False)                              # mark the stop as deliberate FIRST (it must not depend on the network)
+        try: self.api.sync({**self._sync_payload(stopping=True), "wait_seconds": 0}, timeout=3)   # best effort, time-boxed
         except Exception: pass
-        self.state.set("running", False)
+        try: self._upload_once(timeout=3)
+        except Exception: pass
 
     def _spawn(self, name, fn):
-        t = threading.Thread(target=fn, name=name, daemon=True); t.start(); self.threads.append(t)
+        t = threading.Thread(target=fn, name=name, daemon=True); t.start()
+        self.threads = [x for x in self.threads if x.name != name] + [t]; self._thread_fns[name] = fn
+
+    def ensure_threads(self):
+        """Watchdog: restart any worker thread that died (called every 30s by the service host)."""
+        if self.stop.is_set(): return
+        for name, fn in list(self._thread_fns.items()):
+            t = next((x for x in self.threads if x.name == name), None)
+            if t is None or not t.is_alive():
+                log.error("worker thread %s died; restarting it", name)
+                self.emitter.emit("worker_restarted", "agent", "medium", f"Worker thread {name} stopped unexpectedly and was restarted", {"thread": name}, f"wr-{name}-{int(time.time()//600)}")
+                self._spawn(name, fn)
     def _safe(self, fn):
         try: fn()
         except Exception: log.exception("error in %s", getattr(fn, "__name__", fn))
@@ -73,13 +84,13 @@ class Agent:
         return {"agent_version": __version__, "current_mode": "secure" if self.policy.secure_mode else "open", "hostname": socket.gethostname(),
                 "os_version": platform.platform(), "system_status": {**(self.posture.status if self.posture else {}), "buffer": self.buffer.stats()},
                 "config_fingerprint": self.config_fp, "service_fingerprint": self.service_fp, "file_hashes": self.file_hashes,
-                "settings_version": -1 if self.force_settings else self.policy.version, "lifecycle": "stopping" if stopping else "running", "buffer": self.buffer.stats()}
+                "wait_seconds": int(self.cfg.get("long_poll_seconds", 25)), "settings_version": -1 if self.force_settings else self.policy.version, "lifecycle": "stopping" if stopping else "running", "buffer": self.buffer.stats()}
 
     def _sync_loop(self):
         backoff = 0
         while not self.stop.is_set():
             try:
-                r = self.api.sync(self._sync_payload()); backoff = 0; self.revoked = False
+                payload = self._sync_payload(); r = self.api.sync(payload, timeout=payload["wait_seconds"] + 20); backoff = 0; self.revoked = False
                 self.force_settings = False
                 if r.get("settings"): self.policy.apply(r["settings"])
                 self.compromised = bool(r.get("compromised"))
@@ -91,7 +102,10 @@ class Agent:
                 self.runner.flush_pending()
                 iso = self.state.get("isolation_until", 0)
                 if iso and iso < time.time(): self._safe(self.runner.restore_network)
-                interval = int(r.get("heartbeat_interval") or self.policy.heartbeat_interval)
+                # Server holds the request open (long-poll) and answers the instant a command arrives, so go straight
+                # back for the next one; an older server that answers immediately falls back to the heartbeat interval.
+                interval = 0.5 if r.get("long_poll") else int(r.get("heartbeat_interval") or self.policy.heartbeat_interval)
+                if r.get("commands"): interval = 0.2
             except apimod.AuthRevoked:
                 self.revoked = True; log.error("device credentials revoked by administrator"); interval = 300
             except apimod.AuthInvalid:
@@ -103,14 +117,14 @@ class Agent:
             self.wake_sync.wait(interval); self.wake_sync.clear()
 
     # ── upload (batched; local rows removed ONLY after server ack) ──────────
-    def _upload_once(self):
+    def _upload_once(self, timeout=None):
         sent = 0
         while not self.stop.is_set() or sent == 0:
             batch = self.buffer.batch(self.cfg["batch_size"])
             if not batch: return sent
             payload = [{"dedup_id": e["dedup_id"], "event_type": e["event_type"], "category": e["category"], "severity": e["severity"], "source": e.get("source", "agent"),
                         "message": e["message"], "details": e.get("details", {}), "event_timestamp": e["event_timestamp"]} for e in batch]
-            r = self.api.events(payload)
+            r = self.api.events(payload, timeout=timeout)
             self.buffer.ack(r.get("accepted", []))
             rej = [x["dedup_id"] for x in r.get("rejected", [])]
             if rej: log.warning("server rejected %d malformed events (dropping them)", len(rej)); self.buffer.discard(rej)

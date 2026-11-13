@@ -117,7 +117,7 @@
   <div class="sidebar-title">Phase 3 – Admin</div>
   <a href="#p3-boot">First administrator</a><a href="#p3-mfa">MFA &amp; lock-down</a>
   <div class="sidebar-title">Phase 4 – Windows agent</div>
-  <a href="#p4-prep">Prepare Windows</a><a href="#p4-reg">Register laptop</a><a href="#p4-svc">Install service</a><a href="#p4-exe">Build .exe</a><a href="#p4-release">Release manifest</a><a href="#p4-sysmon">Sysmon (optional)</a>
+  <a href="#p4-easy">★ Easy install (one line)</a><a href="#p4-prep">Manual install</a><a href="#p4-reg">Register laptop</a><a href="#p4-svc">Install service</a><a href="#p4-exe">Build .exe</a><a href="#p4-release">Release manifest</a><a href="#p4-sysmon">Sysmon (optional)</a>
   <div class="sidebar-title">Phase 5 – Use it</div>
   <a href="#p5">Dashboard usage</a>
   <div class="sidebar-title">Phase 6 – Help</div>
@@ -304,8 +304,32 @@
 
 <div class="progress-bar"><div class="progress-segment done">1 ✓</div><div class="progress-segment done">2 ✓</div><div class="progress-segment done">3 ✓</div><div class="progress-segment current">4 Agent</div><div class="progress-segment pending">5 Use</div></div>
 
+<section id="p4-easy">
+<div class="phase-header"><span class="phase-badge" style="background:var(--yellow);color:#000">PHASE 4</span><h2>Easy install — add a laptop with one pasted line</h2></div>
+<div class="callout info"><span class="callout-icon">ℹ️</span><div><p>This is the recommended way to add laptops. The person at the laptop needs no Python, Git or technical knowledge. The manual steps that follow are for developers and troubleshooting.</p></div></div>
+<div class="step"><span class="step-num">ONE-TIME</span><h3>Publish the Windows program from your repository (administrator, once per version)</h3>
+<ol><li>Make sure the repository <code>Narendraspatil/Sentinel-V3</code> is <strong>public</strong> (laptops download <code>install.ps1</code> and the release without signing in to GitHub).</li>
+<li>Push the project, then create the release. GitHub builds <code>SentinelAgent.exe</code> for you:
+<pre><code><span class="cmd">git tag</span> v3.0.0
+<span class="cmd">git push</span> origin v3.0.0</code></pre>
+The tag must match <code>agent/sentinel/version.py</code>. Watch <strong>Actions → Build agent release</strong>; when green, the <strong>Releases</strong> page has <code>SentinelAgent.exe</code>, <code>SentinelAgent.exe.sha256</code> and <code>manifest.json</code>.</li>
+<li>Open <code>manifest.json</code> from that release and paste it in the dashboard: <strong>Settings → Agent releases</strong> → version <code>3.0.0</code> → Publish (mark as latest). This is what lets the server prove each laptop is running the genuine program.</li></ol></div>
+<div class="step"><span class="step-num">EACH LAPTOP</span><h3>Add a laptop</h3>
+<ol><li>Dashboard → <strong>Settings → Enroll a new laptop</strong> → <strong>Create one-time token</strong> → <strong>Copy command</strong>.</li>
+<li>Send that line to the person (or sit at the laptop). On the laptop open <strong>PowerShell</strong> (Start menu → type <em>PowerShell</em>), paste the line, press <strong>Enter</strong>, click <strong>Yes</strong> on the Windows permission prompt.</li>
+<li>The installer downloads the program from your GitHub release, checks its SHA-256 fingerprint, turns on the Windows auditing Sentinel needs, registers the laptop with the one-time code, installs the service and starts it. About a minute later the laptop shows <strong>Online</strong> in the dashboard.</li></ol>
+<p>The code works <strong>once</strong> and expires (default 60 minutes). If it fails with “already used or expired”, create a new one.</p>
+<pre><code><span class="cmt"># Other things the installer can do (run from PowerShell on the laptop)</span>
+<span class="cmd">.\sentinel-install.ps1</span> -Code <span class="str">'SNTL1...'</span> -Reenroll   <span class="cmt"># wipe the old registration and register again</span>
+<span class="cmd">.\sentinel-install.ps1</span> -Uninstall               <span class="cmt"># remove service + program (keeps logs)</span>
+<span class="cmd">.\sentinel-install.ps1</span> -Uninstall -PurgeData      <span class="cmt"># also delete logs, buffer and credentials</span>
+<span class="cmd">.\sentinel-install.ps1</span> -Code <span class="str">'SNTL1...'</span> -Tag v3.0.0  <span class="cmt"># install a specific version instead of the latest</span></code></pre>
+<p>Running the installer again on a registered laptop simply updates the program and keeps its registration (the code is not used).</p>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div><p><strong>Safety notes.</strong> (1) Anyone who can change your GitHub repository or releases can change what gets installed on laptops, so turn on two-factor authentication for the GitHub account and consider branch protection. (2) The installer rejects a download that does not match its published fingerprint, but the fingerprint comes from the same release; the stronger check is the manifest you published in the dashboard, which marks a laptop <em>integrity: mismatch</em> if its program differs. (3) Windows SmartScreen or antivirus may warn about the unsigned <code>.exe</code>; code-signing it removes that. (4) The pasted line contains the server address and the one-time token, so share it only with the person installing. (5) This installer has not been run on a real Windows machine yet: try it on one laptop before rolling out.</p></div></div></div>
+</section>
+
 <section id="p4-prep">
-<div class="phase-header"><span class="phase-badge" style="background:var(--yellow);color:#000">PHASE 4</span><h2>Step 11 — Prepare the Windows laptop</h2></div>
+<div class="phase-header"><span class="phase-badge" style="background:var(--yellow);color:#000">PHASE 4</span><h2>Step 11 — Manual install: prepare the Windows laptop</h2></div>
 <div class="step"><span class="step-num">11A</span><h3>Install Python and dependencies</h3>
 <ol><li>Install Python 3.10+ from python.org with <strong>Add Python to PATH</strong> ticked.</li><li>Copy the <code>agent</code> folder to the laptop (e.g. <code>C:\Sentinel\agent</code>). Keep it somewhere only administrators can write.</li></ol>
 <pre><code><span class="cmt"># Administrator Command Prompt</span>
@@ -394,6 +418,13 @@ dist\SentinelAgent.exe start</code></pre>
 
 <section id="trouble">
 <div class="phase-header"><span class="phase-badge" style="background:var(--red);color:#fff">PHASE 6</span><h2>Troubleshooting</h2></div>
+<div class="step"><h3>Service stops after a restart, stop/start, or on its own (fixed in 3.0.1)</h3>
+<p>Release <code>v3.0.1</code> hardens the Windows service: it reports <em>Running</em> immediately, never exits because the agent failed (it retries with back-off), restarts dead worker threads, answers Stop / shutdown within ~8 s, and Windows now restarts it after 5 s, 15 s and then every 60 s indefinitely. To upgrade: tag <code>v3.0.1</code>, publish its manifest in <strong>Settings → Agent releases</strong>, then re-run the install command on each laptop (it updates the program and keeps the registration). If it still stops, send these on the laptop (PowerShell as Administrator):</p>
+<pre><code>Get-Content "$env:ProgramData\Sentinel\logs\service-boot.log" -Tail 60
+Get-Content "$env:ProgramData\Sentinel\logs\sentinel.log" -Tail 60
+Get-WinEvent -FilterHashtable @{LogName='System';ProviderName='Service Control Manager'} -MaxEvents 15 | fl TimeCreated,Message</code></pre></div>
+<div class="step"><h3>Secure Mode is slow to switch on/off (fixed in 3.0.1)</h3>
+<p>The laptop now keeps a request open to the server (long-poll, up to 25 s) and the server answers the moment a command is queued, so it normally takes 1–3 s. This uses about one Edge Function call per 25 s per laptop (~100,000 a month each), so the free plan's 500,000 monthly calls cover roughly 4 laptops; set <code>"long_poll_seconds": 0</code> in <code>%ProgramData%\Sentinel\config.json</code> to go back to the heartbeat interval.</p></div>
 <div class="step"><h3>🔴 Login says "Invalid email or password"</h3><ul><li>The message is intentionally generic. Confirm the account exists in Supabase → Authentication → Users.</li><li>Too many attempts → wait a few minutes (Auth rate limit).</li><li>"not an authorized Sentinel administrator": the user exists but has no <code>admin_profiles</code> row (run bootstrap, or it is not the bootstrapped email).</li></ul></div>
 <div class="step"><h3>🔴 Dashboard shows empty tables / "permission denied" / RLS errors</h3><ul><li>You enrolled TOTP but signed in without the code in this browser session → sign out and in again; MFA-less sessions are denied on purpose.</li><li><code>permission denied for table …</code> from the browser means you tried a write; writes only go through <code>admin-api</code>.</li><li>Never "fix" this by disabling RLS or granting <code>anon</code> access.</li></ul></div>
 <div class="step"><h3>🔴 Edge Function errors</h3><ul><li><strong>CORS error in the browser console:</strong> <code>ALLOWED_ORIGIN</code> is wrong (must be exactly <code>https://USER.github.io</code>). Re-run <code>supabase secrets set</code>; no redeploy needed.</li><li><strong>500 internal_error:</strong> Supabase → Edge Functions → the function → Logs. A message about <code>DEVICE_SECRET_PEPPER</code> means that secret is missing or under 32 characters.</li><li><strong>404 / not found:</strong> run <code>supabase functions deploy</code>.</li><li><strong>401 unauthenticated / 403 mfa_required</strong> from <code>admin-api</code>: sign in again with the TOTP code.</li></ul></div>

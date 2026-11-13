@@ -9,6 +9,7 @@ from .monitors.common import run_ps, CREATE_NO_WINDOW
 log = logging.getLogger("sentinel.commands")
 
 class CommandError(Exception): pass
+FAST = {"secure_mode_on", "secure_mode_off", "refresh_config", "network_restore"}
 
 def _parse_ts(s): return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
@@ -46,7 +47,7 @@ class CommandRunner:
         self._report(cid, "acknowledged")
         if handler is None:
             self._finish(cid, ctype, "failed", {"error": "unsupported_command"}); return
-        self._report(cid, "executing")
+        if ctype not in FAST: self._report(cid, "executing")        # instant commands go acknowledged -> completed (one less round trip)
         try: res = handler(cmd.get("command_payload") or {}, cid)
         except Exception as e:
             log.exception("command %s failed", ctype)

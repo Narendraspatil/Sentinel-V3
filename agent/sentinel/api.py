@@ -12,9 +12,9 @@ class DeviceAPI:
         self.base, self.device_id, self.secret, self.timeout = base_url.rstrip("/"), device_id, secret, timeout
         self.s = requests.Session()
 
-    def _post(self, fn, payload):
+    def _post(self, fn, payload, timeout=None):
         try:
-            r = self.s.post(f"{self.base}/{fn}", json=payload, timeout=self.timeout,
+            r = self.s.post(f"{self.base}/{fn}", json=payload, timeout=timeout or self.timeout,
                             headers={"x-device-id": self.device_id, "x-device-secret": self.secret})
         except requests.RequestException as e:
             raise NetworkError(type(e).__name__)
@@ -26,8 +26,8 @@ class DeviceAPI:
         if r.status_code >= 400: raise ApiError(r.status_code, body.get("error", "error"))
         return body
 
-    def sync(self, payload): return self._post("device-sync", payload)
-    def events(self, events): return self._post("device-events", {"events": events})
+    def sync(self, payload, timeout=None): return self._post("device-sync", payload, timeout)
+    def events(self, events, timeout=None): return self._post("device-events", {"events": events}, timeout)
     def command_result(self, command_id, status, result=None):
         return self._post("device-command-result", {"command_id": command_id, "status": status, "result": result or {}})
     def rotate(self): return self._post("device-rotate", {})["device_secret"]

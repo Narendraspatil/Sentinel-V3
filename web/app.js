@@ -90,7 +90,7 @@ function shell() {
 window.addEventListener("hashchange", () => me && route());
 let rt = null; function subscribeRealtime() {
   sb.channel("live").on("postgres_changes", { event: "*", schema: "public" }, () => { clearTimeout(rt); rt = setTimeout(() => { const h = location.hash; if (document.activeElement?.closest("form,.modal,input,textarea,select") || document.querySelector(".modal")) return;
-    if (!(h === "" || h === "#/overview" || h === "#/devices" || /^#\/device\/[^/]+\/?(overview)?$/.test(h))) return;   // never wipe filters/forms
+    if (!(h === "" || h === "#/overview" || h === "#/devices" || /^#\/device\/[^/]+\/?(overview|commands)?$/.test(h) || h === "#/commands")) return;   // never wipe filters/forms
     route(true); }, 1500); }).subscribe();
 }
 async function route(silent) {
@@ -323,7 +323,14 @@ async function settingsView(v) {
   <div class="card"><h3>Retention</h3><p class="sm mu">Security events are never deleted. Only heartbeat samples can be pruned (daily).</p><p>Heartbeat retention: <b>${ret.data?.value ?? "keep forever"}</b> ${owner ? `<br><input id="rt" type="number" min="7" placeholder="days (blank = forever)"> <button id="rt-s">Save</button>` : ""}</p>
   <h3 style="margin-top:1rem">Keep-alive history</h3>${(hc.data || []).map(h => `<div class="sm">${h.success ? "✅" : "❌"} ${fmt(h.checked_at)} · ${esc(h.source)} · ${h.duration_ms}ms</div>`).join("") || '<p class="mu sm">No checks yet</p>'}</div></div>
   <div class="card tw"><h3>Administrator audit log</h3><table><tbody>${(au.data || []).map(a => `<tr><td class="sm">${fmt(a.created_at)}</td><td><b>${esc(a.action)}</b></td><td class="sm mu">${esc(JSON.stringify(a.details).slice(0, 120))}</td></tr>`).join("")}</tbody></table></div>`;
-  v.querySelector("#t-new").onclick = async () => { try { const r = await api("create_enrollment_token", { label: v.querySelector("#t-l").value, ttl_minutes: +v.querySelector("#t-m").value }); v.querySelector("#t-out").innerHTML = `<p class="sm">Copy now — shown only once (expires ${fmt(r.expires_at)}):</p><pre>${esc(r.token)}</pre>`; } catch (e) { toast(errText(e), "bad"); } };
+  v.querySelector("#t-new").onclick = async () => { try {
+    const r = await api("create_enrollment_token", { label: v.querySelector("#t-l").value, ttl_minutes: +v.querySelector("#t-m").value });
+    const b64 = btoa(JSON.stringify({ u: cfg.SUPABASE_URL + "/functions/v1", t: r.token })).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const code = "SNTL1." + b64, repo = cfg.INSTALLER_REPO || "Narendraspatil/Sentinel-V3";
+    const cmd = `irm https://raw.githubusercontent.com/${repo}/main/install.ps1 -OutFile "$env:TEMP\\sentinel-install.ps1"; powershell -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\\sentinel-install.ps1" -Code '${code}'`;
+    v.querySelector("#t-out").innerHTML = `<p class="sm"><b>On the new laptop:</b> open <b>PowerShell</b> (Start menu → type PowerShell), paste this one line and press Enter. Click <b>Yes</b> when Windows asks. It works once and expires ${esc(fmt(r.expires_at))}.</p><pre id="t-cmd">${esc(cmd)}</pre><button id="t-copy" class="pri">Copy command</button> <span class="sm mu">Shown only once — treat it like a password until it is used.</span>`;
+    v.querySelector("#t-copy").onclick = async () => { try { await navigator.clipboard.writeText(cmd); toast("Copied", "ok"); } catch { const rg = document.createRange(); rg.selectNodeContents(v.querySelector("#t-cmd")); getSelection().removeAllRanges(); getSelection().addRange(rg); toast("Press Ctrl+C to copy", ""); } };
+  } catch (e) { toast(errText(e), "bad"); } };
   const pub = v.querySelector("#r-pub"); if (pub) pub.onclick = async () => { try { await api("publish_release", { version: v.querySelector("#r-v").value.trim(), file_hashes: JSON.parse(v.querySelector("#r-h").value), is_latest: v.querySelector("#r-l").checked }); toast("Published", "ok"); route(); } catch (e) { toast(errText(e), "bad"); } };
   const rs = v.querySelector("#rt-s"); if (rs) rs.onclick = async () => { const x = v.querySelector("#rt").value; try { await api("set_retention", { heartbeat_retention_days: x === "" ? null : +x }); toast("Saved", "ok"); route(); } catch (e) { toast(errText(e), "bad"); } };
   mfaPanel(v.querySelector("#mfa"));

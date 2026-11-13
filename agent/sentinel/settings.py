@@ -10,7 +10,7 @@ SERVICE_DISPLAY = "Sentinel Security Agent"
 
 DEFAULTS = {
     "server_url": "", "device_id": "", "device_name": "", "service_name": SERVICE_NAME,
-    "upload_interval": 15, "batch_size": 100, "buffer_max_rows": 100000,
+    "upload_interval": 15, "long_poll_seconds": 25, "batch_size": 100, "buffer_max_rows": 100000,
     "usb_poll_seconds": 20, "posture_interval": 300, "integrity_interval": 300,
     "winlog_interval": 15, "app_poll_seconds": 3,
     "sysmon_enabled": False, "sysmon_event_ids": [1],

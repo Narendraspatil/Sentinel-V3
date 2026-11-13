@@ -157,8 +157,11 @@ def statuses(): return [r["status"] for r in Mock.store["results"]]
 
 def test_command_lifecycle_and_replay_protection(agent):
     c = cmd("secure_mode_on"); agent.runner.handle(c)
-    assert statuses() == ["acknowledged", "executing", "completed"] and agent.policy.secure_mode
-    agent.runner.handle(c); assert len(Mock.store["results"]) == 3     # duplicate delivery ignored
+    assert statuses() == ["acknowledged", "completed"] and agent.policy.secure_mode      # instant command: no separate "executing" round trip
+    agent.runner.handle(c); assert len(Mock.store["results"]) == 2     # duplicate delivery ignored
+
+def test_slow_commands_still_report_executing(agent):
+    agent.runner.handle(cmd("health_report")); assert statuses() == ["acknowledged", "executing", "completed"]
 
 def test_expired_command_not_executed(agent):
     agent.runner.handle(cmd("secure_mode_on", minutes=-1)); assert Mock.store["results"] == [] and not agent.policy.secure_mode
@@ -200,3 +203,35 @@ def test_large_batch_upload(agent):
     agent.cfg["batch_size"] = 100
     for i in range(1500): agent.emitter.emit("t", "login", "low", "m", dedup_id=f"b{i}")
     assert agent._upload_once() == 1500 and len(Mock.store["seen"]) == 1500
+
+# ── install code ────────────────────────────────────────────────────────────
+def test_install_code_roundtrip_and_rejection():
+    import base64
+    from sentinel.cli import parse_code
+    raw = base64.urlsafe_b64encode(json.dumps({"u": "https://abc.supabase.co/functions/v1", "t": "tok123"}).encode()).decode().rstrip("=")
+    assert parse_code("SNTL1." + raw) == ("https://abc.supabase.co/functions/v1", "tok123")
+    assert parse_code("  SNTL1." + raw + "\n")[1] == "tok123"
+    for bad in ("", "garbage", "SNTL2." + raw, "SNTL1.%%%", "SNTL1." + base64.urlsafe_b64encode(b'{"u":"x"}').decode()):
+        with pytest.raises(ValueError): parse_code(bad)
+
+
+def test_watchdog_restarts_dead_worker_thread(agent):
+    ran = threading.Event()
+    agent._spawn("probe", lambda: ran.set()); ran.wait(2); time.sleep(0.2)   # worker exits -> "dies"
+    assert not next(t for t in agent.threads if t.name == "probe").is_alive()
+    ran.clear(); agent.ensure_threads(); assert ran.wait(2)                  # watchdog respawned it
+    assert len([t for t in agent.threads if t.name == "probe"]) == 1
+
+def test_shutdown_is_fast_even_when_server_is_unreachable(agent):
+    Mock.store["fail"] = True
+    t0 = time.time(); agent.shutdown(); assert time.time() - t0 < 6
+    assert agent.state.get("running") is False                              # deliberate stop recorded without needing the network
+
+def test_sync_payload_asks_for_long_poll(agent):
+    assert agent._sync_payload()["wait_seconds"] == 25
+
+def test_recovery_never_gives_up():
+    import inspect
+    from sentinel import service
+    src = inspect.getsource(service.configure_recovery)
+    assert "restart/60000\"" in src and "stop" not in src.split("actions=")[1].split(")")[0]

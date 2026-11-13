@@ -12,6 +12,8 @@ Full step-by-step setup: open **`docs/index.html`** in a browser.
 | `web/` | Static dashboard (GitHub Pages) |
 | `agent/` | Windows service (Python) |
 | `.github/workflows/` | `pages.yml` (deploy), `supabase-keepalive.yml` (daily) |
+| `install.ps1` | One-line laptop installer (downloads the GitHub release, verifies SHA-256, registers, installs the service) |
+| `.github/workflows/release-agent.yml` | Builds `SentinelAgent.exe` on tag `v*` and publishes it as a GitHub Release |
 | `tools/make_manifest.py` | Trusted release hashes |
 | `tests/`, `supabase/tests/` | pytest agent tests, SQL RLS/integrity tests |
 

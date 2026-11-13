@@ -62,22 +62,32 @@ handler(async (req) => {
   // ── commands ──────────────────────────────────────────────────────────────
   await sb.from("device_commands").update({ status: "expired" })
     .eq("device_id", dev.id).in("status", ["pending", "delivered"]).lt("expires_at", nowIso);
-  let commands: unknown[] = [];
-  if (!stopping) {
-    const redeliver = new Date(now.getTime() - 120_000).toISOString();
+  // Long-poll: when the agent sends wait_seconds, hold the request open and answer the moment a command (or a
+  // settings change) appears. That makes Secure Mode on/off take ~1-2 s instead of up to a full heartbeat interval.
+  const waitS = stopping ? 0 : Math.max(0, Math.min(Number(b.wait_seconds) || 0, 25));
+  const deadline = Date.now() + waitS * 1000;
+  const fetchCommands = async () => {
+    const t = new Date(); const redeliver = new Date(t.getTime() - 120_000).toISOString();
     const { data: cmds } = await sb.from("device_commands")
       .select("id,command_type,command_payload,created_at,expires_at").eq("device_id", dev.id)
       .or(`status.eq.pending,and(status.eq.delivered,delivered_at.lt.${redeliver})`)
-      .gt("expires_at", nowIso).order("created_at").limit(10);
-    commands = cmds ?? [];
-    if (cmds?.length) await sb.from("device_commands").update({ status: "delivered", delivered_at: nowIso })
+      .gt("expires_at", t.toISOString()).order("created_at").limit(10);
+    if (cmds?.length) await sb.from("device_commands").update({ status: "delivered", delivered_at: t.toISOString() })
       .in("id", cmds.map((c) => c.id)).in("status", ["pending", "delivered"]);
+    return cmds ?? [];
+  };
+  let commands: unknown[] = stopping ? [] : await fetchCommands();
+  let { data: settings } = await sb.from("device_settings").select("*").eq("device_id", dev.id).maybeSingle();
+  while (waitS > 0 && commands.length === 0 && settings?.settings_version === b.settings_version && Date.now() + 2000 < deadline) {
+    await new Promise((r) => setTimeout(r, 1500));
+    commands = await fetchCommands();
+    if (commands.length) break;
+    const { data: sv } = await sb.from("device_settings").select("settings_version").eq("device_id", dev.id).maybeSingle();
+    if (sv && sv.settings_version !== b.settings_version) { ({ data: settings } = await sb.from("device_settings").select("*").eq("device_id", dev.id).maybeSingle()); break; }
   }
-
-  const { data: settings } = await sb.from("device_settings").select("*").eq("device_id", dev.id).maybeSingle();
   const { data: latest } = await sb.from("agent_releases").select("version").eq("is_latest", true).maybeSingle();
   return json(req, {
-    server_time: nowIso, compromised: !!dev.is_compromised, commands,
+    server_time: new Date().toISOString(), long_poll: waitS > 0, compromised: !!dev.is_compromised, commands,
     settings: settings && settings.settings_version !== b.settings_version ? settings : null,
     settings_version: settings?.settings_version ?? null,
     heartbeat_interval: settings?.heartbeat_interval ?? 30, latest_agent_version: latest?.version ?? null,

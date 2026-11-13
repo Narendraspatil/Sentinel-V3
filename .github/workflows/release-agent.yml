@@ -1,0 +1,63 @@
+name: Build agent release
+
+on:
+  push:
+    tags: ["v*"]          # e.g.  git tag v3.0.1 && git push origin v3.0.1
+  workflow_dispatch: {}   # build only (no release) for testing
+
+permissions:
+  contents: write         # create the GitHub Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Check tag matches agent version
+        shell: bash
+        run: |
+          v=$(python -c "import re;print(re.search(r'\"(.+?)\"',open('agent/sentinel/version.py').read()).group(1))")
+          echo "agent version: $v"
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$v" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match agent/sentinel/version.py ($v). Update version.py first."; exit 1
+          fi
+
+      - name: Install build tools
+        run: pip install -r agent/requirements.txt pyinstaller
+
+      - name: Build SentinelAgent.exe
+        working-directory: agent
+        run: pyinstaller --noconfirm sentinel_agent.spec
+
+      - name: Smoke test (the exe must start and import everything)
+        run: agent\dist\SentinelAgent.exe status
+
+      - name: Checksum + integrity manifest
+        shell: bash
+        working-directory: agent/dist
+        run: |
+          sha256sum SentinelAgent.exe > SentinelAgent.exe.sha256
+          python ../../tools/make_manifest.py SentinelAgent.exe > manifest.json
+          cat SentinelAgent.exe.sha256 manifest.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-agent
+          path: |
+            agent/dist/SentinelAgent.exe
+            agent/dist/SentinelAgent.exe.sha256
+            agent/dist/manifest.json
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" agent/dist/SentinelAgent.exe agent/dist/SentinelAgent.exe.sha256 agent/dist/manifest.json \
+            --title "Sentinel $GITHUB_REF_NAME" \
+            --notes "Windows agent $GITHUB_REF_NAME. Publish manifest.json in the dashboard (Settings > Agent releases) so laptops can be integrity-checked."
